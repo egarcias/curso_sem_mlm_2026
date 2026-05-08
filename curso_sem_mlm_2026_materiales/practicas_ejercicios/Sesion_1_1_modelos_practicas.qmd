@@ -1,0 +1,440 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 1.1 Introducción a los Modelos de Ecuaciones Estructurales"
+author: "Efraín García Sánchez"
+date: "08/05/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+## Conocer nuestra base de datos
+
+:::: columns 
+
+::: {.column width="50%"}
+
+#### Base de datos: ["Health and Wellbeing Student Survey"](https://pure.northampton.ac.uk/en/datasets/dataset-for-health-and-wellbeing-student-survey/)
+
+- Encuesta a **590 estudiantes universitarios**
+- Cada fila representa **un/a estudiante**
+- Cada columna representa **una variable del cuestionario**
+
+#### Bloques principales
+
+- Características sociodemográficas
+- Salud física y mental
+- Sueño y conexión social
+- Actividad física
+- Alimentación
+- Cafeína, alcohol y nicotina
+- Cambios de hábitos desde la llegada a la universidad
+
+:::
+
+::: {.column width="50%" .small}
+
+![Northampton student health and wellbeing survey](../imagenes/northampton_survey.png){fig-align="center" width="85%"}
+
+Fuente: [Roberts et al. (2024)](https://www.tandfonline.com/doi/full/10.1080/09581596.2024.2338182)
+
+:::
+
+::::
+
+## Codebook (Ver el libro de códigos para toda la información) `../data/northampton_student_health_codebook.csv`
+
+```{r}
+#| eval: false
+# 1. Características sociodemográficas
+age_group
+gender
+sexual_orientation
+ethnicity
+study_mode
+study_level
+living_situation
+
+# 2. Salud y bienestar general
+phys_health
+ment_health
+social_connect
+sleep_quality
+sitting_weekday_hours
+
+# 3. Actividad física
+pa_importance
+pa_guideline_awareness
+pa_guideline_confidence
+pa_activity_level
+pa_resistance_days
+pa_barriers
+pa_changed_uni
+pa_change_direction
+
+# 4. Alimentación
+eat_fruit
+eat_vegetables
+eat_calcium
+eat_white_meat
+eat_red_meat
+eat_processed_meat
+eat_seafood
+eat_legumes
+eat_sweets
+eat_fast_food
+eat_convenience_food
+eat_home_cooked
+eat_breakfast
+eat_snacks
+
+# 5. Barreras para consumir saludablement
+eat_motivation
+eat_affordability
+eat_barriers
+
+# 6. Consumo de sustancias y cambio de hábitos
+nicotine_freq
+caffeine_non_exam
+caffeine_exam
+alcohol_freq
+alcohol_binge_freq
+diet_changed_uni
+diet_change_direction
+```
+
+## Preparar el ambiente de trabajo
+
+```{r}
+# Instalar paquetes
+# install.packages("tidyverse")
+# install.packages("easystats")
+# install.packages("haven")
+# install.packages("psych")
+# install.packages("sjmisc")
+# install.packages("here")
+# install.packages("GGally)
+
+# Cargar paquetes
+library(tidyverse)
+library(easystats)
+library(haven)
+library(psych)
+library(sjmisc)
+library(here)
+library(GGally)
+```
+
+## Preparar el directorio de trabajo ("working directory")
+
+```{r}
+#| output-location: fragment
+here::here()
+# "the path root is implicitly set to "the path to the top-level of my current project"
+```
+
+
+:::: columns
+
+::: {.column width="50%"}
+::: incremental
+- Abrir siempre el archivo `.Rproj`
+- No mas `setwd()` o direcciones completas o parciales en los reportes 
+- Usar `here()` cada vez que lean o guarden archivos.
+
+::: fragment
+```{r}
+#| eval: false
+here("datos", "archivo.csv")
+read_csv("datos/northampton_student_health_raw_labels.csv") # ruta parcial
+here("imagenes","logos",  "figura.png") # subcarpetas
+```
+:::
+
+:::
+:::
+
+
+::: {.column width="50%"}
+![](https://raw.githubusercontent.com/allisonhorst/stats-illustrations/master/rstats-artwork/here.png){fig-align="center" width="50%"}
+:::
+
+::::
+
+
+## Importar la base de datos (usando `here`)
+
+```{r}
+#| message: false
+# datos *numéricos*: bueno para todo; pero no es intuitivo
+data_num <- readr::read_csv(
+  here::here("data", 
+             "northampton_student_health_data_package",
+             "northampton_student_health_numeric.csv"))
+
+# datos *categóricos*: bueno para tablas; pero no para análisis estadísticos
+data_lab <- readr::read_csv(
+  here::here("data", 
+             "northampton_student_health_data_package",
+             "northampton_student_health_raw_labels.csv"))
+
+# datos *etiquetados* (numéricos + etiquetas): bueno para todo, pero no es compatible con algunos paquetes
+data <- haven::read_sav(
+  here::here("data", 
+             "northampton_student_health_data_package",
+             "northampton_student_health_labelled.sav"))
+```
+
+## Importar la base de datos (usando rutas específicas)
+
+```{r}
+#| message: false
+#| eval: false
+
+# datos *numéricos*: bueno para todo; pero no es intuitivo
+data_num <- read_csv("../data/northampton_student_health_data_package/northampton_student_health_numeric.csv")
+
+# datos *categóricos*: bueno para tablas; pero no para análisis estadísticos
+data_lab <- read_csv("../data/northampton_student_health_data_package/northampton_student_health_raw_labels.csv")
+
+# datos *etiquetados* (numéricos + etiquetas): bueno para todo, pero no es compatible con algunos paquetes
+data <- haven::read_sav("../data/northampton_student_health_data_package/northampton_student_health_labelled.sav")
+```
+
+## Ver la base de datos: `data_num` (numéricos)
+
+```{r}
+head(data_num)
+```
+
+## Ver la base de datos: `data_lab` (categóricos)
+
+```{r}
+head(data_lab)
+```
+
+## Ver la base de datos: `data` (numéricos + etiquetas)
+
+```{r}
+head(data)
+```
+
+##  Las variables
+
+```{r}
+names(data)
+```
+
+## La estructura de la base de datos
+
+```{r}
+#| output-location: fragment
+dplyr::glimpse(data)
+```
+
+
+##  Seleccionar algunas variables para examinar
+
+```{r}
+data_small <- data |>
+  dplyr::select(
+    age_group,
+    ethnicity,
+    phys_health,
+    ment_health,
+    sleep_quality,
+    social_connect
+  )
+```
+
+##  Revisar la frecuencia de algunos grupos
+
+**Género**
+```{r} 
+#| output-location: column-fragment
+data_small |>
+  count(age_group)
+```
+
+
+## Revisar la frecuencia de variables `sjmisc::frq`
+
+
+```{r}
+#| output-location: fragment
+data_small |> 
+  dplyr::select(ethnicity) |> 
+  sjmisc::frq()
+```
+
+
+## Revisar descriptivos `psych::describe()`
+
+```{r}
+#| output-location: fragment
+data_small |> 
+  psych::describe()
+```
+
+## Revisar descriptivos por grupo `psych::describeBy()`
+
+```{r}
+#| output-location: fragment
+data_small |> 
+  dplyr::filter(ethnicity %in% c(1,3, 4)) |> 
+  psych::describeBy(group = "ethnicity")
+```
+
+## Resumir resultados por grupo `group_by()` y `summarize()`
+
+```{r}
+#| output-location: fragment
+data_small |> 
+  dplyr::filter(ethnicity %in% c(1,3, 4)) |> # filtrar por grupos grandes
+  dplyr::group_by(ethnicity) |> 
+  dplyr::summarize(mean_sleep = mean(sleep_quality, na.rm = TRUE),
+                   sd_sleep = sd(sleep_quality, na.rm = TRUE),
+                   n_group = n())
+```
+
+
+## Explorar algunas correlaciones
+
+```{r}
+data_small |> 
+  cor(use = "pairwise.complete.obs") |> # para usar casos completos
+  round(digits = 2)
+```
+
+
+## Explorar algunas correlaciones
+
+```{r}
+data_small |> 
+  correlation::correlation()
+```
+
+## Explorar algunas correlaciones
+
+```{r}
+data_small |> 
+  dplyr::select(sleep_quality, phys_health, ment_health) |> 
+  GGally::ggpairs()
+```
+
+# Ejercicio
+
+## Ejercicio (15 minutos)
+
+Vamos a explorar cuatro variables de hábitos de salud:
+
+```{r}
+# escribir su código aquí
+```
+
+### Instrucciones
+
+1. Crea una base reducida llamada `data_exercise` con esas cuatro variables.
+2. Revisa la estructura de la base con `glimpse()`.
+3. Calcula descriptivos generales con `psych::describe()`.
+4. Calcula una matriz de correlaciones entre las cuatro variables.
+5. **Buscar**: Haz un gráfico de dispersión entre consumo de cafeína `caffeine_exam` y de alcohol `alcohol_freq`
+
+---
+
+## Solución 1. Crear una base reducida
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+## Solución 2. Revisar la estructura
+
+```{r}
+# escribir su código aquí
+```
+
+### Preguntas
+
+- ¿Cuántas variables tiene la base reducida?
+- ¿Las variables son numéricas?
+- ¿Hay valores perdidos?
+
+---
+
+## Solución 3. Descriptivos generales
+
+```{r}
+# escribir su código aquí
+```
+
+### Preguntas
+
+- ¿Qué variable tiene la media más alta?
+- ¿Qué variable tiene la desviación estándar más alta?
+- ¿Qué variable tiene más valores perdidos?
+
+---
+
+## Solución 4. Matriz de correlaciones
+
+```{r}
+# escribir su código aquí
+```
+
+### Preguntas
+
+- ¿Qué dos variables tienen la correlación más alta?
+- ¿La correlación es positiva o negativa?
+- ¿Qué significa esa asociación?
+
+---
+
+## Solución 5. Correlaciones con `correlation()`
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+## Solución 6. Gráfico de dispersión
+
+```{r}
+# escribir su código aquí
+```
+
+### Preguntas
+- ¿Qué nos dice eso sobre la relación entre consumo de café y alcohol?
+
+---
+
+## Solución 7. Resumen final
+
+Completa estas frases a partir de los resultados:
+
+```markdown
+
+La correlación más fuerte fue entre: _________ y _________
+
+La asociación entre consumo de cafeína y de alcohol parece ser: 
+positiva / negativa / muy débil / inexistente
+
+Una hipótesis posible sería:
+______________________________________________
+```
+

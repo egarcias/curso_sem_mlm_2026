@@ -1,0 +1,572 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 1.2 Modelos de Regresión Lineal"
+author: "Efraín García Sánchez"
+date: "08/05/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+## Preparar el ambiente de trabajo
+
+```{r}
+#| echo: true
+# instalar los paquetes
+# install.packages("tidyverse")
+# install.packages("car")
+# install.packages("sjPlot")
+# install.packages("sjmisc")
+
+# Cargar los paquetes
+library(tidyverse)
+library(car)
+library(sjPlot)
+library(sjmisc)
+```
+
+## Importar los datos
+
+```{r}
+#| echo: true
+#| message: false
+#| output-location: fragment
+data <- haven::read_sav(
+  here::here("data", 
+             "northampton_student_health_data_package",
+             "northampton_student_health_labelled.sav"))
+
+dplyr::glimpse(data)
+```
+
+## Pregunta de Investigación y Variables
+
+### ¿cómo se asocia la actividad física y el consumo de alcohol con la salud mental auto-reportada?
+
+```{r}
+#| eval: false
+ment_health       # "In general, how would you rate your mental health?"
+pa_activity_level # "how many days 30 minutes or more of physical activity?"
+alcohol_freq      # "How often do you have a drink containing alcohol?"
+```
+
+
+## Explorar los datos: `psych::describe()`
+
+```{r}
+#| echo: true
+#| message: false
+#| output-location: fragment
+data |> 
+  select(ment_health, pa_activity_level, alcohol_freq, gender, age_group, ethnicity) |> 
+  psych::describe()
+```
+
+## Preparar los datos `data wrangling`
+
+- Transformar y recodificar variables
+
+```{r}
+data <- data |> 
+  mutate(# creo variable dummy para género (Female vs Male)
+         gender_female = case_when(gender == 1 ~ 1, # Female
+                                   gender == 2 ~ 0, # Male
+                                   .default = NULL),
+         # creo una variable de etnia para los grupos más grandes
+         ethnicity_cat = case_when(ethnicity == 1 ~ "White",
+                                 ethnicity == 3 ~ "Black",
+                                 ethnicity == 4 ~ "Asian",
+                                 TRUE ~ NA_character_),
+         # ordeno la variable de etnia en niveles (White es la referencia)
+         ethnicity_cat = factor(ethnicity_cat,
+                                levels = c("White", "Black", "Asian")),
+         # Creo una variable dummy para ver diferencias con White
+         ethnicity_black = ifelse(test = ethnicity_cat == "Black", 
+                                  yes = 1, no = 0),
+         ethnicity_asian = ifelse(test = ethnicity_cat == "Asian", 
+                                  yes = 1, no = 0))
+  
+```
+
+## Verificar que ha salido bien
+
+```{r}
+data |> 
+  select(gender, gender_female, 
+         ethnicity, ethnicity_cat, 
+         ethnicity_black, ethnicity_asian) |> 
+  tail(n = 10)
+```
+
+
+## Explorar los datos: correlaciones
+
+```{r}
+#| message: false
+#| output-location: fragment
+
+data |> 
+    dplyr::select(ment_health, pa_activity_level, alcohol_freq) |>
+  correlation::correlation()
+```
+
+## Explorar los datos: correlaciones (+ distribuciones)
+
+```{r}
+#| message: false
+#| output-location: fragment
+#| fig-align: center
+data |> 
+  select(ment_health, pa_activity_level, alcohol_freq) |> 
+  GGally::ggpairs()
+```
+
+## Modelo de Regresión: El intercepto
+
+```{r}
+
+m0 <- lm(formula =  ment_health ~ 1, 
+         data = data)
+```
+
+::: fragment
+```{r}
+#| output-location: fragment
+summary(m0)
+```
+:::
+
+::: fragment
+```{r}
+#| output-location: fragment
+mean(data$ment_health, na.rm = TRUE)
+```
+:::
+
+## Regresión Simple (un único predictor)
+
+```{r}
+
+m1 <- lm(ment_health ~ pa_activity_level, data = data)
+```
+
+::: fragment
+```{r}
+parameters::parameters(m1)
+```
+:::
+
+## Regresión Simple (un único predictor: estandarizada)
+::: fragment
+```{r}
+#| output-location: fragment
+parameters::standardize_parameters(m1)
+```
+:::
+
+::: fragment
+
+```{r}
+#| output-location: fragment
+data |> 
+  select(ment_health, pa_activity_level) |> 
+  cor() |> 
+  round(digits = 2)
+```
+:::
+
+## Regresión Múltiple (más de un predictor)
+
+```{r}
+m2 <- lm(ment_health ~ pa_activity_level + alcohol_freq, 
+              data = data)
+
+parameters::parameters(m2)
+```
+
+
+## Regresión Múltiple (más de un predictor)
+
+```{r}
+#| output-location: fragment
+m2 <- lm(ment_health ~ pa_activity_level + alcohol_freq, 
+              data = data)
+
+summary(m2)
+```
+
+## Regresión Múltiple (+ covariables)
+
+```{r}
+#| output-location: fragment
+m3 <- lm(ment_health ~ pa_activity_level + alcohol_freq + age_group + gender_female, 
+              data = data)
+
+parameters::parameters(m3)
+```
+
+## Comparar el desempeño de los modelos
+
+```{r}
+#| output-location: fragment
+performance::compare_performance(m0, m1, m2, m3)
+```
+
+## Comparar los parámeteros de los modelos
+
+```{r}
+#| output-location: fragment
+parameters::compare_parameters(m0, m1, m2, m3)
+```
+
+
+## Comparar modelos (parámetros y rendimiento) `sjPlot::tab_model()`
+
+```{r}
+#| output-location: slide
+sjPlot::tab_model(m0, m1, m2, m3)
+```
+
+## Comparar modelos (parámetros y rendimiento) `sjPlot::tab_model()`
+
+```{r}
+#| output-location: slide
+sjPlot::tab_model(m0, m1, m2, m3,
+                  dv.labels = c("M0. (intercepto)",
+                                "M1. (PA activity)",
+                                "M2. (+alcohol)",
+                                "M3. (demographics)"),
+                  show.ci = FALSE,
+                  show.aicc = TRUE,
+                  show.aic = TRUE,
+                  auto.label = FALSE)
+```
+
+# Ejercicio
+
+## Ejercicio (20 minutos)
+
+¿la salud mental auto-reportada se asocia con la etnia, el consumo de café y la calidad del sueño?
+
+La variable dependiente será `ment_health`.
+
+Los predictores principales serán:
+
+```{r}
+# escribir su código aquí
+```
+
+1. Explora descriptivamente las variables principales.
+2. Comprueba que las variables dummy de etnia están correctamente codificadas (puedes usar `count()`)
+3. Examina las asociaciones bivariadas entre salud mental, consumo de café y calidad del sueño.
+4. Estima un modelo con etnia como predictor.
+5. Estima un modelo **adicionando** consumo de café como predictor.
+6. Estima un modelo **adicionando** calidad del sueño como predictor.
+7. Estima un modelo controlando por `género` y `edad.`
+8. Compara los modelos.
+9. Diagnostica el modelo ajustado.
+10. Visualiza los coeficientes del modelo ajustado.
+11. Redacta una conclusión breve evitando interpretaciones causales fuertes.
+
+### Reto adicional
+
+Prueba si la calidad del sueño modera la relación entre consumo de café y salud mental.
+
+# Soluciones
+
+## Solución 1: explorar variables principales
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- El número de casos válidos por variable.
+- La presencia de valores perdidos.
+- La media y desviación típica de las variables continuas.
+- El rango de las variables.
+
+### Interpretación esperada
+
+Antes de estimar modelos, debemos comprobar que las variables tienen valores válidos, que no hay errores evidentes de codificación y que las variables continuas presentan variabilidad suficiente.
+
+---
+
+## Solución 2: comprobar las dummies de etnia
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- Las personas clasificadas como `White` deberían tener:
+  - `ethnicity_black = 0`
+  - `ethnicity_asian = 0`
+
+- Las personas clasificadas como `Black` deberían tener:
+  - `ethnicity_black = 1`
+  - `ethnicity_asian = 0`
+
+- Las personas clasificadas como `Asian` deberían tener:
+  - `ethnicity_black = 0`
+  - `ethnicity_asian = 1`
+
+### Interpretación esperada
+
+El grupo `White` funciona como grupo de referencia. Por tanto, los coeficientes de `ethnicity_black` y `ethnicity_asian` indican diferencias promedio respecto al grupo `White`.
+
+---
+
+## Solución 3: asociaciones bivariadas
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- La dirección de la asociación entre `caffeine_exam` y `ment_health`.
+- La dirección de la asociación entre `sleep_quality` y `ment_health`.
+- La fuerza relativa de ambas asociaciones.
+
+## Solución 3: asociaciones bivariadas
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- Si las relaciones parecen aproximadamente lineales.
+- Si hay posibles casos extremos o distribuciones extrañas
+
+### Interpretación esperada
+
+Las correlaciones permiten una primera aproximación descriptiva, pero no controlan por otras variables. Por eso, después estimamos modelos de regresión múltiple.
+
+---
+
+## Solución 4: modelo con etnia
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación de los coeficientes
+
+- El intercepto representa el valor esperado de `ment_health` para el grupo `White`.
+- El coeficiente de `ethnicity_black` representa la diferencia promedio entre el grupo `Black` y el grupo `White`.
+- El coeficiente de `ethnicity_asian` representa la diferencia promedio entre el grupo `Asian` y el grupo `White`.
+
+### Ejemplo de redacción
+
+El modelo estimó diferencias en salud mental según etnia, usando el grupo White como referencia. Los coeficientes de `ethnicity_black` y `ethnicity_asian` indican si estos grupos presentan valores promedio de salud mental más altos o más bajos que el grupo White.
+
+---
+
+## Solución 5: modelo con consumo de café
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación de los coeficientes
+
+- El intercepto representa el valor esperado de `ment_health` cuando `caffeine_exam = 0`.
+- El coeficiente de `caffeine_exam` indica cuánto cambia `ment_health` por cada unidad adicional de consumo de café.
+
+### Ejemplo de redacción
+
+El modelo estima la asociación entre consumo de café y salud mental. Un coeficiente negativo indicaría que un mayor consumo de café se asocia con valores más bajos en salud mental. 
+
+---
+
+## Solución 6: modelo con calidad del sueño
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación de los coeficientes
+
+- El intercepto representa el valor esperado de `ment_health` cuando `sleep_quality = 0`.
+- El coeficiente de `sleep_quality` indica cuánto cambia `ment_health` por cada unidad adicional de calidad del sueño.
+
+### Qué deberían comparar
+
+- Si los coeficientes de etnia cambian respecto al modelo simple.
+- Si el coeficiente de café cambia al incluir calidad del sueño.
+- Si el coeficiente de sueño se mantiene al controlar por café y etnia.
+- Qué predictores siguen siendo estadísticamente significativos.
+
+### Ejemplo de redacción
+
+Al incluir etnia, consumo de café y calidad del sueño en el mismo modelo, cada coeficiente representa la asociación única de ese predictor con salud mental, controlando por los demás predictores del modelo.
+
+---
+
+## Solución 7: modelo ajustado por covariables
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- Si los coeficientes principales cambian al añadir `gender_female` y `age_group`.
+- Si algunos predictores dejan de ser significativos.
+- Si el modelo ajustado permite una interpretación más completa.
+
+### Ejemplo de redacción
+
+Después de ajustar por género y edad, el modelo permite estimar la asociación entre los predictores principales y salud mental manteniendo constantes estas covariables sociodemográficas.
+
+---
+
+## Solución 8: comparación de modelos
+
+```{r}
+# escribir su código aquí
+```
+
+## Solución 8: comparación de modelos
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- Qué modelo tiene mayor `R2`.
+- Qué modelo tiene mejor AIC/BIC.
+- Si el modelo ajustado mejora respecto a los modelos simples.
+- Si algunos coeficientes cambian notablemente entre modelos.
+
+### Interpretación esperada
+
+Un modelo con más predictores suele explicar más varianza, pero eso no significa automáticamente que sea mejor. La comparación debe considerar el ajuste, la parsimonia y la interpretación teórica.
+
+---
+
+## Solución 10: tabla final de modelos
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación esperada
+
+La tabla permite comparar los coeficientes, errores estándar, significación estadística e indicadores de ajuste de los distintos modelos en un formato más claro.
+
+---
+
+## Solución 10: diagnóstico del modelo ajustado
+
+```{r}
+# escribir su código aquí
+```
+
+## Solución 10: diagnóstico del modelo ajustado
+
+```{r}
+# escribir su código aquí
+```
+
+### Qué deberían observar
+
+- Si los residuos se distribuyen de forma aproximadamente normal.
+- Si hay problemas de heterocedasticidad.
+- Si hay casos influyentes.
+- Si los valores de VIF sugieren colinealidad problemática (VIF > 10).
+
+### Interpretación esperada
+
+El diagnóstico permite evaluar si el modelo cumple razonablemente los supuestos de regresión lineal. Si hay problemas graves, los resultados deben interpretarse con cautela o modificar el modelo.
+
+---
+
+## Solución 11: visualización de coeficientes
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación esperada
+
+El gráfico permite comparar la magnitud relativa de los predictores en escala estandarizada.
+
+### Qué deberían observar
+
+- Qué predictor tiene el coeficiente más grande.
+- Qué predictores tienen intervalos que cruzan cero.
+- Qué variables parecen tener asociaciones más consistentes con salud mental.
+
+---
+
+## Solución 12: reporte automático (orientativo)
+
+```{r}
+# escribir su código aquí
+```
+
+### Ejemplo de redacción general
+
+Se estimó un modelo de regresión lineal para analizar si la salud mental auto-reportada se asociaba con etnia, consumo de café y calidad del sueño, ajustando por género y edad. Los resultados indican que algunos predictores se asociaron con la salud mental incluso después de controlar por las covariables incluidas en el modelo. En particular, los coeficientes permiten identificar qué variables se relacionan con valores más altos o más bajos en salud mental. Sin embargo, dado que se trata de un análisis observacional y transversal, los resultados deben interpretarse como asociaciones y no como evidencia causal.
+
+# Reto adicional
+
+## Solución reto: interacción entre café y sueño
+
+```{r}
+# escribir su código aquí
+```
+
+## Solución reto: interacción entre café y sueño
+
+```{r}
+# escribir su código aquí
+```
+
+### Interpretación esperada
+
+El término de interacción `caffeine_exam:sleep_quality` indica si la asociación entre consumo de café y salud mental cambia en función de la calidad del sueño.
+
+### Cómo interpretar
+
+- Si la interacción no es significativa, no hay evidencia clara de que la relación entre café y salud mental dependa de la calidad del sueño.
+- Si la interacción es significativa, la asociación entre café y salud mental varía según los niveles de calidad del sueño.
+- El gráfico de interacción ayuda a visualizar si la pendiente de café cambia cuando la calidad del sueño es baja, media o alta.
+
+---
+
+## Conclusión final esperada
+
+Una conclusión adecuada debería responder a tres preguntas:
+
+::: incremental
+- ¿Qué variables parecen asociarse más claramente con salud mental?
+  - Calidad del sueño
+
+- ¿El modelo ajustado mejora la interpretación respecto a los modelos simples?
+  - Aumento en R2, mejor ajuste y controlando por posibles confusores (etnia, edad y género)
+
+- ¿Qué limitaciones tiene el análisis?
+  - Sólo asociaciones
+  - La teoría: ¿el consumo de café predice la salud mental o viceversa?
+
+:::
+

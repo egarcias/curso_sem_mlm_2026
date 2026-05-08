@@ -1,0 +1,62 @@
+variable,variable_label
+id,ID
+age_group,What is your age?
+gender,Are you...?
+sexual_orientation,Which of the following options best describes how you think of yourself?
+ethnicity,Which one of the following best describes your ethnic group or background?
+study_mode,Are you currently studying full-time or part time?
+study_level,What level are you currently studying at?
+living_situation,Please select the option that best describes your living situation during semester time
+phys_health,"In general, how would you rate your physical health?"
+ment_health,"In general, how would you rate your mental health?"
+social_connect,"To what extent do you agree with the following statement: ""I feel part of the student community and have a sense of social connection to the university"""
+sitting_weekday_hours,time you spent sitting on weekdays during a typical week.
+sleep_quality,overall sleep quality
+nicotine_freq,How often do you consume any nicotine containing products?
+pa_importance,Please select your response to the following statement 'Physical activity is important to me'
+pa_guideline_awareness,Are you aware of what the current UK government guidelines are for recommended weekly physical activity for your age?
+pa_guideline_confidence,"How confident are you that you meet the current UK government guidelines for recommended weekly physical activity? (Only asked to those that responded ""yes"" to knowing what guidelines are)"
+pa_activity_level,"On a typical week, on how many days have you done a total of 30 minutes or more of physical activity?"
+pa_resistance_days,"How many days per week, on average, do you engage in resistance training"
+pa_barriers,Do you feel there are any barriers to you participating in physical activity?
+pa_changed_uni,Do you feel your physical activity habits have changed since coming to university
+pa_change_direction,Please select the option that best describes this change in physical activity habits.
+eat_fruit,How many servings of fruit do you usually have
+eat_vegetables,How many servings of vegetables do you usually have
+eat_calcium,How often do you consume calcium containing products
+eat_white_meat,How often do you eat white meat
+eat_red_meat,How often do you eat red meat
+eat_processed_meat,How often do you eat packaged meat
+eat_seafood,How often do you eat seafood?
+eat_legumes,How often do you eat legumes
+eat_sweets,How often do you eat sweets/cakes/chocolate/crisps?
+eat_fast_food,"How often do you order food from, or eat at, fast food establishments or takeaways?"
+eat_convenience_food,"How often do you purchase and consume packaged/convenience foods (e.g ready meals, meal deals)?"
+eat_home_cooked,How often do you prepare and/or consume home-cooked meals?
+eat_breakfast,How often do you consume breakfast?
+eat_snacks,How often do you snack between meals?
+eat_motivation,"Please select your response to this statement: ""I can motivate myself to eat appropriately."""
+eat_affordability,"I am able to afford the food, beverages and meals that I want to consume regularly."
+eat_barriers,Do you feel that you experience any barriers to healthy eating?
+caffeine_non_exam,How often do you consume caffeine containing products NOT EXAM TIME
+caffeine_exam,How often do you consume caffeine containing products DURING EXAM PERIODS
+alcohol_freq,How often do you have a drink containing alcohol?
+alcohol_binge_freq,How often do you consume 8 or more units of alcohol on one occasion
+diet_changed_uni,Do you feel that your dietary habits have changed since coming to university?
+diet_change_direction,Please select the option that best describes this change
+food_purchase_self,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: self selected."
+food_purchase_parent_caregiver,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: parent caregiver selected."
+food_purchase_partner,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: partner selected."
+food_purchase_friends,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: friends selected."
+food_purchase_housemates,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: housemates selected."
+food_purchase_other_family,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: other family selected."
+food_purchase_other,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: other selected."
+food_purchase_none,"Who primarily PURCHASES your food, meals and beverages? Please select all that apply: Indicator: none selected."
+food_prepare_self,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: self selected.
+food_prepare_parent_caregiver,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: parent caregiver selected.
+food_prepare_partner,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: partner selected.
+food_prepare_friends,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: friends selected.
+food_prepare_housemates,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: housemates selected.
+food_prepare_other_family,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: other family selected.
+food_prepare_other,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: other selected.
+food_prepare_none,Who primarily PREPARES your food and/or meals? Please select all that apply: Indicator: none selected.

@@ -1,0 +1,497 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 1.3 Análisis de Moderación"
+author: "Efraín García Sánchez"
+date: "08/05/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+## Preparar el ambiente de trabajo (instalar, si no están instalados)
+
+
+```{r}
+#| eval: false
+# install.packages("tidyverse")        # manipulación y visualización de datos
+# install.packages("easystats")        # Paquetes para análisis estadísticos 
+# install.packages("sjPlot")           # para visualización de resultados
+# install.packages("sjmisc")           # funciones para manipulación de datos
+# install.packages("marginaleffects")  # estimar predicciones, contrastes y pendientes
+# install.packages("emmeans")          # estima medias marginales
+# install.packages("sjPlot")           # para reportar tablas y figuras
+```
+
+## Preparar el ambiente de trabajo (cargar los paquetes)
+
+
+```{r}
+#| eval: true
+library(tidyverse)        # manipulación y visualización de datos
+library(easystats)        # Paquetes para análisis estadísticos 
+library(sjPlot)           # para visualización de resultados
+library(sjmisc)           # funciones para manipulación de datos
+library(marginaleffects)  # estimar predicciones, contrastes y pendientes
+library(emmeans)          # estima medias marginales
+library(sjPlot)           # para reportar tablas y figuras
+```
+
+## Importar los datos: con etiquetas (para conservar los labels)
+
+```{r}
+#| code-overflow: wrap
+data_labels <- haven::read_sav(
+  here::here("data/northampton_student_health_data_package/northampton_student_health_labelled.sav"))
+
+glimpse(data_labels)
+```
+
+## Importar los datos: solo numéricos (para facilitar la manipulación)
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data/northampton_student_health_data_package/northampton_student_health_numeric.csv"))
+
+glimpse(data)
+```
+
+## Transformar los datos y recodificar variables (igual que antes)
+
+```{r}
+data <- data |> 
+  mutate(# creo variable dummy para género (Female vs Male)
+         gender_female = case_when(gender == 1 ~ 1, # Female
+                                   gender == 2 ~ 0, # Male
+                                   .default = NULL),
+         # creo una variable de etnia para los grupos más grandes
+         ethnicity_cat = case_when(ethnicity == 1 ~ "White",
+                                 ethnicity == 3 ~ "Black",
+                                 ethnicity == 4 ~ "Asian",
+                                 TRUE ~ NA_character_),
+         # ordeno la variable de etnia en niveles (White es la referencia)
+         ethnicity_cat = factor(ethnicity_cat,
+                                levels = c("White", "Black", "Asian")),
+         # Creo una variable dummy para ver diferencias con White
+         ethnicity_black = ifelse(test = ethnicity_cat == "Black", 
+                                  yes = 1, no = 0),
+         ethnicity_asian = ifelse(test = ethnicity_cat == "Asian", 
+                                  yes = 1, no = 0),
+         # creo una variable categórica con pa_activity
+         pa_activity_level_cat = case_when(pa_activity_level == 0 ~ "0_Inactive",
+                                       pa_activity_level == 1 ~ "1_Fairly_Active",
+                                       pa_activity_level == 2 ~ "2_Active")
+         )
+
+  
+```
+
+
+## Centrar las variables
+
+```{r}
+data <- data |> 
+  mutate(
+    # manualmente
+    alcohol_freq_cen = as.numeric(scale(alcohol_freq, center = TRUE, scale = FALSE)),
+    alcohol_freq_z = as.numeric(scale(alcohol_freq, center = TRUE, scale = TRUE))
+    )
+```
+
+::: fragment
+
+```{r}
+# visualizar los datos
+data |> 
+  dplyr::select(alcohol_freq, alcohol_freq_cen, alcohol_freq_z)
+```
+:::
+
+::: fragment
+
+```{r}
+# visualizar los datos
+data |> 
+  dplyr::select(alcohol_freq, alcohol_freq_cen, alcohol_freq_z) |> 
+  psych::describe()
+```
+:::
+
+## Modelos de regresión lineal: efectos simples
+
+```{r}
+#| output-location: fragment
+m0 <- lm(ment_health ~ 1, data = data)
+
+m1 <- lm(ment_health ~ alcohol_freq + pa_activity_level, data = data)
+
+m2 <- lm(ment_health ~ alcohol_freq_cen + pa_activity_level,data = data)
+
+m3 <- lm(ment_health ~ alcohol_freq_z + pa_activity_level,data = data)
+
+# ver los resultados
+parameters::compare_parameters(m0, m1, m2, m3) |> 
+  parameters::display()
+```
+
+## Inspeccionar los resultados
+
+```{r}
+#| output-location: fragment
+sjPlot::tab_model(m0, m1, m2, m3,
+                  show.ci = FALSE,
+                  dv.labels = c("M0. (intercepto = media)",
+                                "M1. (Datos brutos)",
+                                "M2. (Variable centrada)",
+                                "M3.(Variable centrada y estandarizada"),
+                  show.stat = TRUE)
+```
+
+
+::: incremental
+- El intercepto cambia: la media de `Y` cuando el predictor es `0`
+- El coeficiente de regresión no cambia si la variable está centrada o no
+- El coeficiente cambia cuando se estandariza (la unidad de medida ha cambiado)
+- La Varianza explicada no cambia
+:::
+
+## Comparar los modelos
+
+- El `m0` difiere de `m1`, pero de resto son iguales
+
+```{r}
+anova(m0, m1, m2, m3)
+```
+
+## Comparar los modelos `performance::compare_performance()`
+
+```{r}
+#| output-location: fragment
+performance::compare_performance(m0, m1, m2, m3) |> 
+  parameters::display()
+```
+
+## Modelos de regresión lineal: efectos combinados (interacción)
+
+```{r}
+#| output-location: fragment
+m1a <- lm(ment_health ~ alcohol_freq*pa_activity_level,
+         data = data)
+
+m2a <- lm(ment_health ~ alcohol_freq_cen*pa_activity_level,
+         data = data)
+
+m3a <- lm(ment_health ~ alcohol_freq_z*pa_activity_level,
+         data = data)
+
+parameters::compare_parameters(m1, m1a, m2, m2a, m3, m3a) |> 
+  parameters::display()
+```
+
+## Modelos de regresión lineal: efectos combinados (interacción)
+
+```{r}
+#| output-location: fragment
+sjPlot::tab_model(m1, m1a, m2, m2a, m3, m3a,
+                  dv.labels = c("M1. (Datos brutos)","M1a. (Datos brutos + interacción)",
+                                "M2. (centrada)","M2a. (centrada + interacción)",
+                                "M3.(estandarizada","M3a. (estandarizada + interacción)"),
+                  show.ci = FALSE, 
+                  show.p = FALSE)
+```
+
+
+
+## Verificar los supuestos: Sólo para el modelo con efectos simples
+
+```{r}
+#| output-location: fragment
+#| fig-align: center
+performance::check_model(m2)
+```
+
+## Verificar los supuestos: NO se hace con la interacción (multicolinealidad)
+
+```{r}
+#| output-location: fragment
+#| fig-align: center
+performance::check_collinearity(m1a)
+```
+
+## Interpretar la interacción: Evaluar las pendientes simples (*Simple slope analysis*)
+
+```{r}
+#| output-location: fragment
+modelbased::estimate_slopes(model = m2a,
+                            trend = "alcohol_freq_cen",    # Predictora
+                            by = "pa_activity_level")     # Moderadora
+
+```
+
+::: fragment
+- `pa_activity_level` como moderador
+- El efecto de `alcohol_freq_cen` sobre `ment_health`, a diferentes valores de `pa_activity_level` [0 (`Inactive`), 1 (`Fairly active`) y 2 `Active`] 
+:::
+
+## Interpretar la interacción: Evaluar las pendientes simples de forma visual (*Simple slope analysis*)
+
+```{r}
+#| output-location: fragment
+modelbased::estimate_slopes(model = m2a,
+                            trend = "alcohol_freq_cen",    # Predictora
+                            by = "pa_activity_level")  |> 
+  plot()
+```
+
+## Interpretar la interacción: Visualizar las pendientes simples (*Simple slope analysis*)
+
+- Las medias marginales ajustadas (*adjusted marginal means*) en `salud mental` (*dependiente*) por `frecuencia de consumo de alcohol` (*predictora*), en función de la `actividad física` (*moderadora*) 
+
+```{r}
+#| output-location: fragment
+modelbased::estimate_means(model = m2a,
+                           by = c("alcohol_freq_cen", "pa_activity_level")) |> 
+  plot()
+  
+```
+
+## Interpretar la interacción: Visualizar las pendientes simples (*Simple slope analysis*) (ajustado para publicación)
+
+- Se puede adaptar la figura para formato de publicación (`ggplot`)
+
+```{r}
+#| output-location: slide
+#| fig-align: center
+modelbased::estimate_means(model = m2a,
+                           by = c("alcohol_freq_cen", "pa_activity_level")) |> 
+  plot() +
+  labs(x = "Frecuenia de consumo de alcohol (Nunca - Diario)",
+       y = "Salud mental autoreportada",
+       color = "Actividad Física",
+       fill = "Actividad Física" ) +
+  scale_color_discrete(labels = c("Inactive (0)","Fairly Active (1)","Active (2)")) +
+  scale_fill_discrete(labels = c("Inactive (0)","Fairly Active (1)","Active (2)")) +
+  theme_classic()
+  
+```
+
+
+## Examinar la misma moderación desde otra perspectiva
+
+#### Pendientes simples (*Simple slope analysis*): efectos simples
+
+::: incremental
+- `alcohol_freq_cen` como moderador
+- Escogemos valores para probar la interacción (-1SD, Media, +1SD; pero puede ser cualquier valor de interés) 
+
+:::
+
+::: fragment
+
+```{r}
+#| output-location: fragment
+ss_alcohol <- modelbased::estimate_slopes(model = m2a,
+                            trend = "pa_activity_level",       # Predictora
+                            by = "alcohol_freq_cen=[sd]")      # Moderadora
+
+ss_alcohol
+```
+
+:::
+
+## Pendientes Simples: Visualiza el tamaño del efecto (`b`)
+
+- Visualiza la tabla anterior (los efectos de la actividad física sobre la salud mental, en función de la frecuencia de consumo de alcohol)
+
+```{r}
+#| output-location: column-fragment
+ss_alcohol |> 
+  plot()
+```
+
+## Pendientes Simples: Ver las medias marginales ajustadas (`predicted outcome`)
+
+```{r}
+#| output-location: fragment
+#| fig-align: center
+means_alcohol <- modelbased::estimate_means(model = m2a,
+                           by = c("pa_activity_level","alcohol_freq_cen=[sd]")) 
+
+# ver los datos
+means_alcohol
+  
+```
+
+## Pendientes Simples: Visualizar las medias marginales ajustadas (`predicted outcome`)
+
+```{r}
+#| output-location: fragment
+means_alcohol |> 
+  plot()
+  
+```
+
+## Pendientes Simples: Visualizar las medias marginales ajustadas (`predicted outcome`) (ajustado, para publicación)
+
+```{r}
+#| output-location: slide
+#| fig-align: center
+means_alcohol |> 
+  plot() +
+  labs(color = "Alcohol\nconsumption",
+       y = "Salud Mental autoreportada",
+       x = "Frecuencia de actividad física") +
+  scale_x_discrete(labels = c("Inactive", "Fairly active", "Active")) +
+  theme_classic(base_size = 14) +
+  scale_color_discrete(labels = c("-1SD","Mean","+1SD"))
+  
+```
+
+
+## Regiones de significancia `Johnson-Neyman`: Tabla
+
+```{r}
+#| output-location: fragment
+jn_alcohol <- modelbased::estimate_slopes(model = m2a,
+                            trend = "pa_activity_level",# Predictora
+                            by = "alcohol_freq_cen",    # Moderadora
+                            length = 100)  
+summary(jn_alcohol) 
+```
+
+## El tamaño del efecto de `pa_activity_level` a lo largo de 100 valores de `alcohol_freq_cen`. *NOTA: Asumiendo que fuera continua*
+
+```{r}
+jn_alcohol
+```
+
+## Regiones de significancia `Johnson-Neyman`: Visualización
+
+```{r}
+#| output-location: fragment
+jn_alcohol |>  # efectos a -1SD, la media y +1SD
+  plot()
+```
+
+## Regiones de significancia `Johnson-Neyman`: Figura (adaptada para publicación)
+
+```{r}
+#| output-location: slide
+#| fig-align: center
+jn_alcohol |> 
+  plot() +
+  labs(x = "Frecuencia de consumo de alcohol\n(Never - Everyday)",
+       y = "Efecto (b) de la actividad física sobre la salud mental",
+       title = "Tamaño del efecto de la asociación entre Actividad física y Salud Mental,\na diferentes niveles del consumo de alcohol",
+       subtitle = "Jhonson-Neyman Plot") +
+    theme_classic()
+```
+
+# Ejercicio
+
+## Ejercicio: moderación con salud física (20 minutos)
+
+En este ejercicio vamos a evaluar si la relación entre **conexión social** y **salud física** depende de la **etnicidad**.
+
+- Variable dependiente: `phys_health`
+- Variable independiente: `social_connect`
+- Moderadora: `ethnicity_black`
+- Covariables: `gender_female`, `age_group`
+
+### Tareas
+
+1. Preparar las variables necesarias: centrar `social_connect`
+2. Estimar un modelo de regresión con efectos simples: predictoras
+3. Estimar un modelo con interacción 
+4. Presentar los resultados en una tabla.
+5. Evaluar las pendientes simples.
+7. Escribir una conclusión breve.
+
+## Solución 1: preparar las variables
+
+```{r}
+# escribir su código aquí
+```
+
+
+## Solución 2: modelo con efectos simples
+
+```{r}
+# escribir su código aquí
+```
+
+
+## Solución 3: modelo con interacción
+
+```{r}
+# escribir su código aquí
+```
+
+
+## Solución 4: comparar modelos en una tabla
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+```{r}
+# escribir su código aquí
+```
+
+
+
+## Solución 5: tabla de resultados para reportar
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+## Solución 6: pendientes simples
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+```{r}
+# escribir su código aquí
+```
+
+---
+
+```{r}
+# escribir su código aquí
+```
+
+
+## Solución 7: conclusión
+
+```{r}
+# escribir su código aquí
+```
+
+### Conclusión orientativa
+
+- El modelo con efectos simples evalúa si la **conexión social** y la **etnicidad** se asocian con la **salud física**, controlando por género y edad.
+- El modelo con interacción evalúa si la asociación entre **conexión social** y **salud física** es diferente para estudiantes Black y White.
+- Si el término `social_connect_cen:ethnicity_black` es estadísticamente significativo, concluimos que la asociación entre conexión social y salud física depende de la etnicidad.
+- Si no es significativo, concluimos que no hay evidencia suficiente de moderación.
+- Como `ethnicity_black` es dicotómica, la interpretación principal debe basarse en las **pendientes simples**.
+
