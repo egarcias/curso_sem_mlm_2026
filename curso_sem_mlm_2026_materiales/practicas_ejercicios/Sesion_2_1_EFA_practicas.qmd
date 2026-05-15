@@ -1,0 +1,541 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 2.1 Análisis Factorial Exploratorio (EFA)"
+author:
+  - name: "Efraín García Sánchez"
+    affiliations:
+      - name: "CIMCYC — Universidad de Granada" 
+date: "05/15/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+
+## Instalar nuevos paquetes
+
+Este bloque muestra cómo instalar los paquetes necesarios.
+
+```{r}
+#| eval: false
+install.packages("psychTools")
+```
+
+
+## Cargar los paquetes
+
+Este bloque carga los paquetes necesarios para la práctica.
+
+```{r}
+#| eval: true
+library(tidyverse)        # manipulación y visualización de datos
+library(easystats)        # Paquetes para análisis estadísticos 
+library(sjPlot)           # para visualización de resultados, tables y figuras
+library(sjmisc)           # funciones para manipulación de datos
+library(psych)            # para análisis psicométricos
+library(psychTools)       # para extensiones del paquete psych
+```
+
+
+## Importar los datos: con etiquetas (para conservar los labels)
+
+Este bloque importa la base de datos que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data_labels <- haven::read_sav(
+  here::here("data",
+  "northampton_student_health_data_package",
+  "northampton_student_health_labelled.sav"))
+
+glimpse(data_labels)
+```
+
+
+## Importar los datos: solo numéricos (recomendado para evitar conflictos con paquetes)
+
+Este bloque importa la base de datos que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data",
+  "northampton_student_health_data_package",
+  "northampton_student_health_numeric.csv"))
+
+glimpse(data)
+```
+
+
+## Seleccionar un subconjunto de datos para el EFA
+
+Este bloque prepara o verifica las variables seleccionadas para el análisis.
+
+```{r}
+data_prepare <- data |> 
+  dplyr::select(starts_with("food_prepare_")) # selecciona todas las variables que empiezan con "food_prepare_"
+
+# revisamos los nombre
+names(data_prepare)
+```
+
+
+## Revisamos los datos que vamos a incluir: análisis descriptivos
+
+Este bloque obtiene descriptivos para revisar las variables seleccionadas.
+
+```{r}
+psych::describe(data_prepare)
+```
+
+Este bloque prepara o verifica las variables seleccionadas para el análisis.
+
+```{r}
+data_prepare <- data_prepare |> 
+  select(-food_prepare_none) # para eliminar una variable - o !
+
+# revisamos
+names(data_prepare)
+```
+
+
+## Revisamos los datos que vamos a incluir: revisamos items invertidos
+
+Este bloque invierte el ítem para alinear su dirección con el constructo.
+
+```{r}
+data_prepare <- data_prepare |> 
+  datawizard::reverse(select = "food_prepare_self",
+                      range = c(0,1)) 
+```
+
+
+## Revisamos los datos que vamos a incluir: ver distribuciones
+
+Este bloque visualiza la distribución de las respuestas por ítem.
+
+```{r}
+data_prepare |> 
+  tidyr::pivot_longer(
+    cols = 1:7,
+    names_to = "Item",
+    values_to = "Response"
+  ) |> 
+  ggplot2::ggplot(mapping = aes(Response)) +
+  geom_histogram() +
+  facet_wrap(~ Item) 
+```
+
+
+## ¿Los datos son apropiados para un EFA? Inspección manual
+
+Este bloque calcula las correlaciones entre las variables seleccionadas.
+
+```{r}
+#| message: true
+data_cor <- data_prepare |> 
+  correlation::correlation(method = "tetrachoric") # porque usamos variables dicotómicas; dejar en blanco si se usa Pearson
+```
+
+Este bloque muestra la matriz de correlaciones en un formato más legible.
+
+```{r}
+data_cor |> 
+  correlation::display()
+```
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+data_cor |> 
+  summary() |> 
+  plot() 
+```
+
+Este bloque prepara o verifica las variables seleccionadas para el análisis.
+
+```{r}
+data_prepare <- data_prepare |> 
+  select(-food_prepare_other) 
+
+# verificamos
+names(data_prepare)
+```
+
+Este bloque calcula las correlaciones entre las variables seleccionadas.
+
+```{r}
+#| message: true
+data_cor <- data_prepare |> 
+  correlation::correlation(method = "tetrachoric") 
+```
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+data_cor |> 
+  summary() |> 
+  plot() 
+```
+
+Este bloque convierte las correlaciones en matriz para usarlas en pasos posteriores.
+
+```{r}
+data_cor_mtx <- as.matrix(data_cor)
+
+# Mostrar la matriz de correlaciones
+round(data_cor_mtx, 2)
+
+```
+
+
+## ¿Los datos son apropiados para un EFA? Tests formales
+
+Este bloque calcula el KMO para evaluar la adecuación factorial.
+
+```{r}
+# KMO
+psych::KMO(data_cor)
+```
+
+Este bloque aplica el test de Bartlett para revisar la matriz de correlaciones.
+
+```{r}
+# test de Bartlett
+cortest.bartlett(R = data_cor,  # usa la matriz de correlación
+                 n = 590)       # tamaño de la muestra
+
+```
+
+Este bloque evalúa si los datos son apropiados para un análisis factorial.
+
+```{r}
+performance::check_factorstructure(data_prepare)
+```
+
+
+## `parallel análisis`: Identificar el número de factores
+
+Este bloque usa análisis paralelo para orientar el número de factores.
+
+```{r}
+#| fig-align: center
+psych::fa.parallel(data_prepare,
+                   fm = "minres", # Minimal residuals
+                   cor = "tet",   # porque los items son dicotómicos
+                   fa = "fa")   # para PCA sólo cambiar a "pca" o "both"
+abline(h = 1, col = "black", lty = 2, lwd = 2)
+
+```
+
+
+## `Eigen values`: Identificar el número de factores
+
+Este bloque extrae eigenvalues para orientar el número de factores.
+
+```{r}
+m0 <- psych::fa(data_prepare, 
+                nfactors = 6, # igual al número de ítems
+                rotate = "none")
+
+# verificar los eigenvalues mayores que 1
+m0$values[m0$values > 1]
+```
+
+
+## `parameters::n_factor` múltiples formas de evaluar el número de factores
+
+Este bloque compara varios criterios para decidir el número de factores.
+
+```{r}
+prepare_n_factors <- parameters::n_factors(x = data_prepare,
+                                         type = "FA",
+                                         rotation = "varimax",
+                                         algorithm = "minres",
+                                         cor = data_cor_mtx)
+
+prepare_n_factors
+```
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+parameters::display(prepare_n_factors)
+```
+
+
+## `parameters::n_factor`: múltiples formas de evaluar el número de factores
+
+Este bloque visualiza el resultado del análisis anterior.
+
+```{r}
+#| fig-align: center
+plot(prepare_n_factors)
+```
+
+
+## Estimar el modelo: EFA con dos factores
+
+Este bloque estima el modelo factorial exploratorio.
+
+```{r}
+#| message: true
+m1 <- parameters::factor_analysis(
+  x = data_prepare,
+  n = 2,
+  rotation = "oblimin",
+  scores = "regression",
+  cor = "tet"
+)
+```
+
+
+## Revisar el ajuste del modelo: ajuste global
+
+Este bloque revisa el ajuste global del modelo estimado.
+
+```{r}
+performance::model_performance(m1) |> 
+  display()
+```
+
+
+## Revisar el ajuste del modelo: `residuos` y `normalidad`
+
+Este bloque revisa los residuos del modelo factorial.
+
+```{r}
+performance::check_residuals(m1)
+```
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+performance::check_normality(m1) |> 
+  plot()
+```
+
+
+## Inspecionar e interpretar el modelo: `factor loadings`
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+m1 |> 
+  parameters::display(threshold = 0.2, # eliminar si quieren ver todas las cargas
+                      sort = TRUE) 
+```
+
+
+## Inspecionar e interpretar el modelo: `Varianza explicada`
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+m1 |> 
+  summary()
+```
+
+
+## Guardar las puntuaciones de los factores (`factor scores`)
+
+Este bloque extrae las puntuaciones factoriales para cada participante.
+
+```{r}
+m1_scores <- parameters::factor_scores(m1)
+
+head(m1_scores)
+```
+
+
+# Ejercicio
+
+
+## Ejercicio: EFA con hábitos de alimentación
+
+Este bloque enumera los ítems de alimentación que se usarán en el ejercicio.
+
+```{r}
+#| eval: false
+
+eat_fruit
+eat_vegetables
+eat_calcium
+eat_white_meat
+eat_red_meat
+eat_processed_meat
+eat_seafood
+eat_legumes
+eat_sweets
+eat_fast_food
+eat_convenience_food
+eat_home_cooked
+eat_breakfast
+eat_snacks
+```
+
+
+## Solución 1. Crear `data_eat`
+
+Este bloque prepara o verifica las variables seleccionadas para el análisis.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 2. Exploración inicial
+
+Este bloque revisa la estructura general de los datos.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque obtiene descriptivos para revisar las variables seleccionadas.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque visualiza la distribución de las respuestas por ítem.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 2. Distribuciones de los ítems
+
+Este bloque visualiza la distribución de las respuestas por ítem.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 3. Correlaciones entre ítems
+
+Este bloque calcula las correlaciones entre las variables seleccionadas.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque calcula las correlaciones entre las variables seleccionadas.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 4. ¿Los datos son apropiados para EFA?
+
+Este bloque crea una base completa y cuenta los casos disponibles.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque evalúa si los datos son apropiados para un análisis factorial.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 4. Revisar KMO y Bartlett por separado
+
+Este bloque calcula el KMO para evaluar la adecuación factorial.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque aplica el test de Bartlett para revisar la matriz de correlaciones.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 5. Análisis paralelo
+
+Este bloque usa análisis paralelo para orientar el número de factores.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 5. Eigenvalues
+
+Este bloque calcula eigenvalues para contrastar la decisión sobre factores.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 5. `parameters::n_factors()`
+
+Este bloque compara varios criterios para decidir el número de factores.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque visualiza el resultado del análisis anterior.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 6. Estimar el modelo EFA
+
+Este bloque estima el modelo factorial exploratorio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 7. Ajuste global del modelo
+
+Este bloque revisa el ajuste global del modelo estimado.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 7. Cargas factoriales
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 7. Varianza explicada
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+# escribe tu respuesta aquí
+```
+

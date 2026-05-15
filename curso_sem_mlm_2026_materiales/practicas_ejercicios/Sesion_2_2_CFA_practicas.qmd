@@ -1,0 +1,561 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 2.2 Análisis Factorial Confirmatorio (CFA)"
+author:
+  - name: "Efraín García Sánchez"
+    affiliations:
+      - name: "CIMCYC — Universidad de Granada" 
+date: "05/15/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+
+## Procedimiento para un CFA
+
+Este bloque ilustra la proporción de trabajo dedicada a preparar y analizar datos.
+
+```{r}
+#| echo: false
+#| fig-align: center
+#| out-width: 150%
+
+
+# Sample data in a data frame
+pareto <- data.frame(
+  category = c("Data Collection & Wrangling", 
+               "Data Analysis"),
+  values = c(80, 20))
+
+# Create a pie chart
+library(tidyverse)
+  
+ggplot(pareto, aes(x = "", y = values, fill = category)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar(theta = "y") +
+  labs(x = NULL, y = NULL, fill = "Task") +
+  theme_void() +
+  theme(legend.position = "top") +
+  scale_fill_manual(values = c("#1f77b4", "#ff7f0e"))
+```
+
+
+## Preparar el ambiente de trabajo
+
+Este bloque muestra cómo instalar los paquetes necesarios.
+
+```{r}
+# install.packages("lavaan")
+# install.packages("lavaanExtra")
+# install.packages("tidySEM")
+# install.packages("semTools")     
+```
+
+Este bloque carga los paquetes necesarios para la práctica.
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(lavaanExtra)  # para formatode salida de lavaan 
+library(tidySEM)      # para formatode salida de lavaan
+library(lavaan)       # Para modelos SEM
+library(semTools)     # Para fiabilidad y otros relacionadas con SEM
+```
+
+
+## Importar los datos: solo numéricos (recomendado para evitar conflictos con paquetes)
+
+Este bloque importa la base de datos que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data",
+  "northampton_student_health_data_package",
+  "northampton_student_health_numeric.csv"))
+
+glimpse(data)
+```
+
+
+## Crear un subconjunto de datos (para facilitar la demostración)
+
+Este bloque crea el subconjunto de alimentación y revisa su estructura.
+
+```{r}
+data_eat <- data |> 
+  select(eat_fruit, eat_vegetables, eat_calcium, 
+         eat_red_meat, eat_white_meat, eat_seafood, 
+         eat_processed_meat, eat_convenience_food, eat_fast_food,
+         eat_sweets, eat_snacks)
+
+glimpse(data_eat)
+```
+
+
+## Práctica: Ajustar un modelo de medición para `habitos de alimentación`
+
+Este bloque muestra la idea conceptual del modelo de medición.
+
+```{r}
+#| eval: false
+# Los factores y las variables 
+eat_healthy = eat_fruit + eat_vegetables + eat_calcium
+eat_meat = eat_red_meat + eat_white_meat + eat_seafood
+eat_unhealthy = eat_processed_meat + eat_convenience_food +
+  eat_fast_food + eat_sweets + eat_snacks
+
+```
+
+
+## Examinar los datos
+
+Este bloque obtiene descriptivos para revisar las variables seleccionadas.
+
+```{r}
+psych::describe(data_eat)
+```
+
+
+## Examinar las correlaciones entre las variables
+
+Este bloque visualiza distribuciones y relaciones bivariadas entre ítems.
+
+```{r}
+#| out-width: "100%"
+#| fig-align: center
+data_eat |> 
+  psych::pairs.panels()
+```
+
+Este bloque calcula las correlaciones entre las variables seleccionadas.
+
+```{r}
+data_eat_cor <- data_eat |> 
+  correlation::correlation() 
+```
+
+Este bloque resume y visualiza el patrón de correlaciones.
+
+```{r}
+#| out-width: "100%"
+#| fig-align: center
+data_eat_cor |> 
+  summary() |> 
+  plot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) # para que no se solape el texto en el eje X
+```
+
+
+## Especificación del modelo: conceptual
+
+Este bloque estima el modelo de medición con CFA.
+
+```{r}
+#| echo: false
+#| fig-align: center
+#| out-width: 150%
+
+m_eat <- 'eat_healthy =~ eat_fruit + eat_vegetables + eat_calcium
+              eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food +  + eat_sweets + eat_snacks
+              eat_meat =~ eat_red_meat + eat_white_meat + eat_seafood'
+
+m_eat_fit <- lavaan::cfa(m_eat, data = data_eat)
+
+m_eat_plot <- semPlot::semPaths(m_eat_fit, 
+                  layout = "tree2", 
+                  rotation = 2, 
+                  style = "lisrel",
+                  whatLabels = "no",
+                  sizeLat = 14,
+                  curve = 2.5,
+                  curvature = 1,
+                  sizeMan = 8,
+                  nCharNodes = 13)
+```
+
+
+## Especificación del modelo: lavaan (sintaxis)
+
+Este bloque escribe el modelo de medición con sintaxis de lavaan.
+
+```{r}
+m_eat <- 'eat_healthy =~ eat_fruit + eat_vegetables + eat_calcium
+              eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food +  + eat_sweets + eat_snacks
+              eat_meat =~ eat_red_meat + eat_white_meat + eat_seafood'
+```
+
+
+## Especificación del modelo: lavaan (diagrama)
+
+Este bloque visualiza el resultado del análisis anterior.
+
+```{r}
+#| echo: false
+
+plot(m_eat_plot)
+```
+
+
+## Identificación estadística
+
+Este bloque visualiza el resultado del análisis anterior.
+
+```{r}
+#| echo: false
+plot(m_eat_plot)
+```
+
+
+## Estimación de los parámetros: `lavaan::cfa()`
+
+Este bloque estima el modelo de medición con CFA.
+
+```{r}
+
+# Especificar el modelo
+m_eat <- 'eat_healthy =~ eat_fruit + eat_vegetables + eat_calcium
+              eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food
+              eat_meat =~ eat_red_meat + eat_white_meat + eat_seafood + eat_sweets + eat_snacks
+              '
+
+# Estimar el modelo
+m_eat_fit <- lavaan::cfa(model = m_eat, 
+                         data = data_eat)
+```
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+# resumen del modelo
+lavaan::summary(m_eat_fit, 
+        standardized = TRUE)  # muestra los coeficientes estandarizados  
+```
+
+
+## Representación gráfica del modelo
+
+Este bloque genera una representación gráfica del modelo.
+
+```{r}
+#| fig-align: center
+#| out-width: 100%
+semPlot::semPaths(m_eat_fit, 
+                  what = "std")
+```
+
+
+## Representación gráfica del modelo (ajustado)
+
+Este bloque genera una representación gráfica del modelo.
+
+```{r}
+#| fig-align: center
+#| out-width: 100%
+semPlot::semPaths(m_eat_fit, 
+                  what = "std", 
+                  layout = "tree2", 
+                  rotation = 2, style = "lisrel",
+                  edge.color = "black",
+                  sizeLat = 14,
+                  curve = 2.5,
+                  sizeMan = 8,
+                  nCharNodes = 0)
+```
+
+
+## Evaluación del modelo: todos
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+lavaan::fitmeasures(m_eat_fit, 
+                    output = "text")
+```
+
+
+## Evaluación del modelo: algunos indicadores
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+# Estadísticos de ajuste
+lavaan::fitmeasures(m_eat_fit,
+                    fit.measures =  c("cfi", "tli", "srmr",
+                                      "rmsea", "rmsea.ci.lower", "rmsea.ci.upper") # seleccionar
+                    ) 
+```
+
+
+## Evaluar el modelo: algunos indicadores
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+lavaanExtra::nice_fit(m_eat_fit) |> 
+  display()
+```
+
+
+## Interpretación general [effectsize::interpret()](https://easystats.github.io/effectsize/reference/interpret_gfi.html)
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+#| warning: false
+#| message: false
+
+effectsize::interpret(m_eat_fit) |> 
+  effectsize::display()
+```
+
+
+## Evaluar el modelo: Ajuste local en las cargas factoriales
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+parameters::parameters(m_eat_fit, standardize = TRUE) |> 
+  parameters::display()
+```
+
+
+## Evaluación del modelo: Ajuste local en los `residual correlations`
+
+Este bloque extrae residuos para revisar desajustes locales.
+
+```{r}
+residuos_correlaciones <- lavaan::residuals(m_eat_fit, 
+                                            type = "cor.bentler")
+
+# visualizar
+residuos_correlaciones
+```
+
+Este bloque organiza los residuos para identificar los pares con mayor desajuste.
+
+```{r}
+# para verlos como una lista
+
+as.data.frame(as.table(residuos_correlaciones$cov)) |> # convierto en lista
+  mutate(
+    Var1 = as.character(Var1),
+    Var2 = as.character(Var2),
+    value = abs(Freq)) |> # creo una variable con valor absoluto
+   filter(Var1 < Var2) |> # elimino pares duplicados
+  filter(value > .10) |>  # selecciono valor absoluto > .10
+  arrange(desc(value)) # orden descendente
+```
+
+
+## Evaluación del modelo: Ajuste local en los residuos estandarizados
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+residuos_estandarizados <- lavaan::residuals(m_eat_fit, 
+                                            type = "standardized")
+
+residuos_estandarizados
+```
+
+Este bloque organiza los residuos para identificar los pares con mayor desajuste.
+
+```{r}
+as.data.frame(as.table(residuos_estandarizados$cov)) |> # convierto en lista
+  mutate(
+    Var1 = as.character(Var1),
+    Var2 = as.character(Var2),
+    value = abs(Freq)) |> # creo una variable con valor absoluto
+   filter(Var1 < Var2) |> # elimino pares duplicados
+  filter(value > 2.57) |>  # selecciono valor absoluto > .257 (corresponde a p < .01)
+  arrange(desc(value)) # orden descendente
+```
+
+
+## Evaluación del modelo: Ajuste local en los `índices de modificación`
+
+Este bloque revisa índices de modificación para detectar posibles mejoras del modelo.
+
+```{r}
+lavaan::modificationindices(m_eat_fit, 
+                            sort. = TRUE) |> 
+  dplyr::filter(mi > 10) 
+```
+
+
+## Re-especificar el modelo
+
+Este bloque estima el modelo de medición con CFA.
+
+```{r}
+# re-especificar el modelo
+m_eat_resp <- '
+          eat_healthy =~ eat_fruit + eat_vegetables + eat_calcium
+          eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food
+          eat_meat =~ eat_red_meat + eat_white_meat + eat_seafood 
+          eat_sweets_snacks =~ eat_sweets + eat_snacks
+          '
+
+# estimar el modelo
+m_eat_resp_fit <- lavaan::cfa(m_eat_resp, data = data_eat)
+
+# evaluar el modelo: ajuste global
+effectsize::interpret(m_eat_resp_fit)
+```
+
+
+## Comparar los modelos
+
+Este bloque compara el ajuste entre los modelos estimados.
+
+```{r}
+library(lavaan)
+library(semTools)
+
+fit_comp <- semTools::compareFit(m_eat_fit, m_eat_resp_fit)
+
+summary(fit_comp) 
+```
+
+
+## Reportar los resultados con tablas [tidySEM](https://cjvanlissa.github.io/tidySEM/index.html) (adaptado)
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+tidySEM::table_results(m_eat_resp_fit,
+                       columns = c("label", "est_sig_std", "se_std", "pval_std", "confint_std"), 
+                       digits = 3) |> 
+  #parameters::display() |> 
+  filter(grepl(".BY.", label)) |> # para seleccionar cargas factoriales
+  mutate(label = str_replace(label, 
+                             pattern = ".BY.", 
+                             replacement = " predicted by ")) |> 
+  knitr::kable(col.names = c("Parámetro", "Factor loadings", "SE", "p", "95% CI"))
+```
+
+
+## Reportar los resultados con figuras (adaptado)
+
+Este bloque genera una representación gráfica del modelo.
+
+```{r}
+semPlot::semPaths(m_eat_resp_fit, 
+                  what = "std", 
+                  layout = "tree2", 
+                  rotation = 2, 
+                  style = "lisrel",
+                  edge.color = "black",
+                  sizeLat = 14,
+                  curve = 2.5,
+                  sizeMan = 8,
+                  nCharNodes = 0)
+```
+
+
+## Fiabilidad: Omega de MacDonald ($\omega$) [(Flora, 2022)](https://journals.sagepub.com/doi/full/10.1177/2515245920951747)
+
+Este bloque calcula la fiabilidad de los factores estimados.
+
+```{r}
+# calcular el omega de Macdonald
+semTools::compRelSEM(m_eat_resp_fit,
+                     tau.eq = FALSE) # tau.eq = TRUE devuelve el alpha de Cronbach
+                     
+```
+
+
+# Ejercicio: CFA
+
+
+## Ejercicio: modelo de bienestar y sustancias
+
+Este bloque muestra el modelo de bienestar y sustancias que se trabajará en el ejercicio.
+
+```{r}
+#| eval: false
+
+wellbeing =~ ment_health + phys_health + social_connect + sleep_quality
+substances =~ caffeine_non_exam + alcohol_freq + nicotine_freq
+```
+
+
+## Solución 1. Especificar el modelo
+
+Este bloque crea el subconjunto de variables que se analizará.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 2. Estimar el modelo
+
+Este bloque estima el modelo de medición con CFA.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 3. Evaluar el ajuste global
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+Este bloque revisa indicadores de ajuste global del modelo.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Solución 4. Inspeccionar el modelo
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Cargas factoriales y correlación entre factores
+
+Este bloque presenta los parámetros del modelo en una tabla interpretativa.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+
+## Desajuste local
+
+Este bloque revisa índices de modificación para detectar posibles mejoras del modelo.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
