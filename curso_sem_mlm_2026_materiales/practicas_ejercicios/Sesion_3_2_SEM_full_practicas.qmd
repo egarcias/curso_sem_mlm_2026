@@ -1,0 +1,386 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 3.2 Full SEM"
+author:
+  - name: "Efraín García Sánchez"
+    affiliations:
+      - name: "CIMCYC — Universidad de Granada" 
+date: "05/15/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+    code-tools: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica: Full SEM
+
+## Práctica: Full SEM
+
+## Preparar el ambiente de trabajo
+
+Este bloque carga los paquetes necesarios para la práctica.
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(lavaanExtra)  # para formatode salida de lavaan 
+library(tidySEM)      # para formatode salida de lavaan
+library(lavaan)       # Para modelos SEM
+library(semTools)     # Para fiabilidad y otros relacionadas con SEM
+library(semPlot)      # Para visualizar modelos SEM
+```
+
+## Importar los datos: solo numéricos (recomendado para evitar conflictos con paquetes)
+
+Este bloque importa la base de datos que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data",
+  "northampton_student_health_data_package",
+  "northampton_student_health_numeric.csv"))
+
+glimpse(data)
+```
+
+## Preparar los datos
+
+Este bloque prepara variables auxiliares para el modelo.
+
+```{r}
+data <- data |> 
+  mutate(# creo variable dummy para género (Female vs Male)
+         gender_female = case_when(gender == 1 ~ 1, # Female
+                                   gender == 2 ~ 0, # Male
+                                   .default = NULL),
+         # creo una variable de etnia para los grupos más grandes
+         ethnicity_cat = case_when(ethnicity == 1 ~ "White",
+                                 ethnicity == 3 ~ "Black",
+                                 ethnicity == 4 ~ "Asian",
+                                 TRUE ~ NA_character_),
+         # ordeno la variable de etnia en niveles (White es la referencia)
+         ethnicity_cat = factor(ethnicity_cat,
+                                levels = c("White", "Black", "Asian")),
+         # Creo una variable dummy para ver diferencias con White
+         ethnicity_black = ifelse(test = ethnicity_cat == "Black", 
+                                  yes = 1, no = 0),
+         ethnicity_asian = ifelse(test = ethnicity_cat == "Asian", 
+                                  yes = 1, no = 0),
+         # creo una variable categórica con pa_activity
+         pa_activity_level_cat = case_when(pa_activity_level == 0 ~ "0_Inactive",
+                                       pa_activity_level == 1 ~ "1_Fairly_Active",
+                                       pa_activity_level == 2 ~ "2_Active")
+         )
+
+  
+```
+
+## Especificar el modelo
+
+Este bloque escribe el modelo en sintaxis de lavaan.
+
+```{r}
+m1 <- '
+  # Modelo de medición
+  wellbeing =~ ment_health + phys_health + social_connect + sleep_quality
+  substances =~ caffeine_non_exam + alcohol_freq + nicotine_freq
+  eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food
+  
+  # Modelo estructural
+  wellbeing ~ substances + eat_unhealthy 
+'
+```
+
+## Estimar el modelo
+
+Este bloque estima el modelo especificado.
+
+```{r}
+m1_fit <- lavaan::sem(
+  model = m1,
+  estimator = "ML",
+  data = data)
+```
+
+## Evaluar el modelo
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+
+summary(m1_fit, 
+        standardized = TRUE, 
+        ci = TRUE, 
+        fit.measures = TRUE)
+```
+
+## Evaluar el modelo
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+lavaan::fitmeasures(m1_fit, 
+                    output = "text")
+```
+
+## Reportar el modelo
+
+Este bloque organiza los parámetros del modelo para su interpretación.
+
+```{r}
+parameters::parameters(m1_fit, 
+            ci = 0.95, 
+            standardize = TRUE) 
+```
+
+## Representar el modelo estructural + medición
+
+Este bloque genera una visualización del modelo estimado.
+
+```{r}
+#| out-width: 200%
+#| fig-align: center
+semPlot::semPaths(m1_fit, 
+                  whatLabels = "std", 
+                  rotation = 2, 
+                  layout = "tree2")
+```
+
+# Ejercicio: Full SEM
+
+## Ejercicio: Full SEM
+
+- Replicar el ejercicio anterior con las siguientes variaciones:
+  - Usar *eat_healthy* como variable predictora (*eat_fruit + eat_vegetables + eat_calcium*)
+  - Adicionar covariables al modelo prediciendo "*wellbeing*": *gender_female*, *age_group*
+- Especificar el modelo
+- Estimar el modelo
+- Evaluar el modelo
+
+## Respuesta 1. especificar el modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 2. estimar el modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 3. evaluar el modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 4. índices de ajuste del modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 5. reportar parámetros del modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 6. visualizar el modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 7. interpretación del modelo Full SEM
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+# Práctica: Mediación con modelos SEM
+
+## Especificar el modelo
+
+
+## Especificar el modelo
+
+Este bloque escribe el modelo en sintaxis de lavaan.
+
+```{r}
+m2 <- '
+  # Modelo de medición
+  wellbeing =~ ment_health + phys_health + social_connect + sleep_quality
+  substances =~ caffeine_non_exam + alcohol_freq + nicotine_freq
+  eat_unhealthy =~ eat_processed_meat + eat_convenience_food + eat_fast_food
+  
+  # Modelo estructural
+  substances ~ a*eat_unhealthy 
+  wellbeing ~ b*substances + c*eat_unhealthy
+  
+  # Efecto indirecto
+  indirecto:= a*b
+  directo := c
+  total := a*b + c
+  
+  # Tamaño del efecto indirecto (de forma descriptiva, pero inestables)
+  proporcion := indirecto/total # cuánto del efecto *total* es por el indirecto
+  ratio := indirecto/directo    # cuánto es el efecto indirecto en relación al
+'
+
+```
+
+## Estimar el modelo
+
+Este bloque estima el modelo especificado.
+
+```{r}
+m2_fit <- lavaan::sem(
+  model = m2,
+   bootstrap = 100L, # aumentar a 1000 o 5000 para resultados más estables
+   test = "bootstrap",
+  data = data)
+```
+
+## Evaluar el modelo
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+summary(m2_fit, 
+        std = TRUE, 
+        ci = TRUE, 
+        fit.measures = TRUE)
+```
+
+## Evaluar el modelo
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+lavaan::fitmeasures(m2_fit, 
+                    output = "text")
+```
+
+## Reportar el modelo
+
+Este bloque organiza los parámetros del modelo para su interpretación.
+
+```{r}
+parameters::parameters(m2_fit, 
+            ci = 0.95, 
+            standardize = TRUE) |> 
+  display()
+```
+
+## Representar el modelo estructural + medición
+
+Este bloque genera una visualización del modelo estimado.
+
+```{r}
+#| out-width: 200%
+#| fig-align: center
+semPlot::semPaths(m2_fit, 
+                  whatLabels = "std", 
+                  style = "lisrel",
+                  rotation = 2, 
+                  layout = "tree2")
+```
+
+# Ejercicio
+
+## Ejercicio: Mediación con SEM
+
+- Probar la mediación usando *eat_healthy* como predictora del consumo de sustancias
+  - *eat_healthy =~ eat_fruit + eat_vegetables + eat_calcium*
+
+- Replicar el ejercicio anterior con las siguientes variaciones:
+  - Usar *eat_healthy* como predictora
+  - Usar *substances* como mediadora
+  - Usar *wellbeing* como resultado
+  - Controlar por covariables en wellbeing (*gender_female*, *age_group*)
+- Estimar el efecto indirecto de **eat_healthy** sobre **wellbeing** a través de **substances**
+
+## Respuesta 1. especificar el modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 2. estimar el modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 3. evaluar el modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 4. índices de ajuste del modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 5. reportar efectos directos e indirectos
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 6. visualizar el modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 7. interpretación del modelo de mediación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```

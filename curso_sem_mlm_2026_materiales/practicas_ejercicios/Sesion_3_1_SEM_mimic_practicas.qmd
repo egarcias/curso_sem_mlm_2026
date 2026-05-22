@@ -1,0 +1,314 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 3.1 Modelos SEM - MIMIC"
+author:
+  - name: "Efraín García Sánchez"
+    affiliations:
+      - name: "CIMCYC — Universidad de Granada" 
+date: "05/22/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+    code-tools: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+## Preparar el ambiente de trabajo
+
+Este bloque carga los paquetes necesarios para la práctica.
+
+```{r}
+library(tidyverse)
+library(easystats)
+library(tidySEM)      # para formatode salida de lavaan
+library(lavaan)       # Para modelos SEM
+library(semTools)     # Para fiabilidad y otros relacionadas con SEM
+library(semPlot)
+library(psych)
+```
+
+## Importar los datos: solo numéricos (recomendado para evitar conflictos con paquetes)
+
+Este bloque importa la base de datos que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data",
+  "northampton_student_health_data_package",
+  "northampton_student_health_numeric.csv"))
+
+glimpse(data)
+```
+
+## Preparar los datos
+
+Este bloque prepara variables auxiliares para el modelo.
+
+```{r}
+data <- data |> 
+  mutate(# creo variable dummy para género (Female vs Male)
+         gender_female = case_when(gender == 1 ~ 1, # Female
+                                   gender == 2 ~ 0, # Male
+                                   .default = NULL),
+         # creo una variable de etnia para los grupos más grandes
+         ethnicity_cat = case_when(ethnicity == 1 ~ "White",
+                                 ethnicity == 3 ~ "Black",
+                                 ethnicity == 4 ~ "Asian",
+                                 TRUE ~ NA_character_),
+         # ordeno la variable de etnia en niveles (White es la referencia)
+         ethnicity_cat = factor(ethnicity_cat,
+                                levels = c("White", "Black", "Asian")),
+         # Creo una variable dummy para ver diferencias con White
+         ethnicity_black = ifelse(test = ethnicity_cat == "Black", 
+                                  yes = 1, no = 0),
+         ethnicity_asian = ifelse(test = ethnicity_cat == "Asian", 
+                                  yes = 1, no = 0),
+         # creo una variable categórica con pa_activity
+         pa_activity_level_cat = case_when(pa_activity_level == 0 ~ "0_Inactive",
+                                       pa_activity_level == 1 ~ "1_Fairly_Active",
+                                       pa_activity_level == 2 ~ "2_Active")
+         )
+
+  
+```
+
+## MIMIC: Especificar y estimar el modelo de medición
+
+Este bloque especifica y estima el modelo inicial.
+
+```{r}
+m1 <- 'wellbeing =~ ment_health + phys_health + social_connect + sleep_quality'
+
+# Estimar el modelo
+m1_fit <- lavaan::sem(
+  m1,
+  estimator = "MLR",
+  data = data
+)
+```
+
+- Revisar los resultados
+
+```{r}
+# resumen del modelo
+summary(m1_fit,
+        std = TRUE, 
+        ci = TRUE,
+        fit.measures = TRUE)  # muestra los intervalos de confianza
+```
+
+
+## MIMIC: Visualizar el modelo de medición (opcional)
+
+Este bloque genera una visualización del modelo estimado.
+
+```{r}
+
+semPlot::semPaths(m1_fit, 
+         what = "std",
+         rotation = 2, 
+         fade = FALSE)
+```
+
+## Modelo MIMIC: Especificar el modelo estructural
+
+Este bloque escribe el modelo en sintaxis de lavaan.
+
+```{r}
+
+m2 <- '
+# Modelo de Medición
+wellbeing =~ ment_health + phys_health + social_connect + sleep_quality
+
+# Modelo Estructural
+wellbeing ~ gender_female + age_group 
+'
+```
+
+## Modelo MIMIC: Estimar el modelo estructural
+
+Este bloque estima el modelo especificado.
+
+```{r}
+# Estimar el modelo
+m2_fit <- lavaan::sem(
+  m2,
+  estimator = "MLR",
+  data = data
+)
+```
+
+## Modelo MIMIC: Evaluar el modelo estructural
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+# resumen del modelo
+summary(m2_fit,
+        std = TRUE, 
+        ci = TRUE,             # muestra los intervalos de confianza
+        fit.measures = TRUE)   # muestra los índices de ajuste
+```
+
+## Modelo MIMIC: Evaluar el modelo
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+lavaan::fitmeasures(m2_fit, 
+                    output = "text")
+```
+
+## Modelo MIMIC: Evaluar el modelo (algunas orientaciones)
+
+Este bloque revisa el ajuste y la salida general del modelo.
+
+```{r}
+effectsize::interpret(m2_fit)
+```
+
+## Reportar el modelo MIMIC
+
+Este bloque organiza los parámetros del modelo para su interpretación.
+
+```{r}
+parameters::parameters(m2_fit)
+```
+
+## Visualizar el modelo MIMIC (opcional)
+
+Este bloque genera una visualización del modelo estimado.
+
+```{r}
+
+semPlot::semPaths(m2_fit, 
+         what = "std",
+         rotation = 2,
+         fade = FALSE)
+```
+
+# Ejercicio: MIMIC
+
+## Instrucciones
+
+Vamos a adaptar la práctica para estimar un modelo MIMIC con **dos variables latentes** y cuatro predictores observados.
+
+### Modelo de medición
+
+- **wellbeing**: factor latente de bienestar, medido por:
+  - **ment_health**
+  - **phys_health**
+  - **social_connect**
+  - **sleep_quality**
+- **substances**: factor latente de consumo de sustancias, medido por:
+  - **caffeine_non_exam**
+  - **alcohol_freq**
+  - **nicotine_freq**
+
+### Modelo estructural
+
+Ambos factores latentes serán predichos por:
+
+- **gender_female**: variable dummy, 1 = mujer, 0 = hombre.
+- **age_group**: grupo de edad.
+- **pa_importance**: importancia atribuida a la actividad física.
+- **sitting_weekday_hours**: horas de sedentarismo entre semana.
+
+## Instrucciones
+
+### Tareas
+
+1. Especificar el modelo MIMIC en sintaxis de **lavaan**, incluyendo el modelo de medición y el modelo estructural.
+2. Estimar el modelo con **lavaan::sem()** y estimador robusto **MLR**.
+3. Revisar el resumen general del modelo
+4. Evaluar el ajuste global del modelo con índices robustos e interpretaciones orientativas.
+5. Inspeccionar el modelo de medición, prestando atención a las cargas factoriales de **wellbeing** y **substances**.
+6. Inspeccionar el modelo estructural, prestando atención a los efectos de **gender_female**, **age_group**, **pa_importance** y **sitting_weekday_hours**.
+7. Visualizar el modelo estimado.
+8. Pensar una conclusión sustantiva breve que integre ajuste global, medición y relaciones estructurales.
+
+## Respuesta 1. especificar el modelo MIMIC
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 2. estimar el modelo
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 3. resumen general del modelo
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 4a. evaluar el ajuste global
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 4b. interpretar el ajuste global
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 5. inspeccionar el modelo de medición
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 6. inspeccionar el modelo estructural
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 7. visualizar el modelo
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 8. conclusión sustantiva
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
