@@ -1,0 +1,545 @@
+---
+title: "Principios y Prácticas de SEM y MLM (5ed)"
+subtitle: "Tema 4.1 Introducción a los Modelos Mixtos o Multinivel"
+author:
+  - name: "Efraín García Sánchez"
+    affiliations:
+      - name: "CIMCYC — Universidad de Granada" 
+date: "05/29/2026"
+toc: true
+toc-title: "Contenidos"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    self-contained: true
+    code-fold: false
+    code-tools: true
+execute:
+  echo: true
+  eval: true
+  warning: false
+  message: false
+editor: source
+---
+
+# Práctica
+
+## Preparar el ambiente de trabajo
+
+Este bloque carga los paquetes necesarios para la práctica.
+
+```{r}
+# install.packages("glmmTMB")
+# install.packages("glmmTMB", type = "source")
+
+library(tidyverse)
+library(easystats)
+library(glmmTMB)
+```
+
+## Importar los datos
+
+Este bloque importa la base de datos en formato largo que se usará en la práctica.
+
+```{r}
+#| code-overflow: wrap
+data <- readr::read_csv(
+  here::here("data",
+             "data_mlm",
+             "data_naragon_2023.csv")
+  ) |> 
+  round(2)
+
+glimpse(data)
+```
+
+## Explorar la estructura de los datos
+
+Este bloque revisa cuántas observaciones tiene cada persona.
+
+```{r}
+data |> 
+  count(id)
+```
+
+## Revisar el formato largo
+
+Este bloque muestra cómo se repiten las observaciones dentro de cada persona.
+
+```{r}
+data |> 
+  select(id, day_cen, wellbeing, dysphoria, positive_affect) |> 
+  filter(id %in% c(102, 103)) |> 
+  display()
+```
+
+## Explorar diferencias entre personas
+
+Este bloque calcula descriptivos por persona para observar la variabilidad entre e intra sujetos.
+
+```{r}
+#| output-location: slide
+data |> 
+  select(id, wellbeing, dysphoria) |> 
+  filter(id %in% c(102, 103, 104)) |> 
+  psych::describeBy(group = "id", fast = TRUE)
+```
+
+## Visualizar trayectorias individuales
+
+Este bloque grafica trayectorias de bienestar para una muestra de participantes.
+
+```{r}
+#| fig-align: center
+
+data |> 
+  drop_na(wellbeing) |> 
+  filter(id %in% sample(unique(id), 16)) |> 
+  ggplot(aes(x = day_cen, y = wellbeing, group = id)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ id) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_continuous(breaks = c(0:6)) +
+  theme_classic()
+```
+
+## Visualizar diferencias en pendientes
+
+Este bloque compara las tendencias individuales con la tendencia promedio de la muestra.
+
+```{r}
+#| fig-align: center
+
+set.seed(270526)
+
+data |> 
+  drop_na(wellbeing) |> 
+  filter(id %in% sample(unique(id), 16)) |> 
+  ggplot(aes(x = day_cen, y = wellbeing, group = id, color = as.factor(id))) +
+  geom_smooth(method = "lm", se = FALSE) +
+  scale_x_continuous(breaks = c(0:6)) +
+  theme_classic() +
+  labs(color = "Participante") +
+  geom_smooth(
+    data = data |> drop_na(wellbeing),
+    aes(x = day_cen, y = wellbeing),
+    inherit.aes = FALSE,
+    method = "lm",
+    se = FALSE,
+    color = "black",
+    linewidth = 3
+  )
+```
+
+## Preparar los datos: centrar variables
+
+Este bloque separa la varianza intra-persona y entre-personas mediante centrado por grupo.
+
+```{r}
+#| output-location: slide
+data <- data |>
+  datawizard::demean(
+    select = c("wellbeing", "decentering", "negative_affect", "positive_affect",
+               "dysphoria", "BFI_N", "BFI_E", "BFI_O", "BFI_C", "BFI_A"),
+    by = "id",
+    suffix_demean = "_wp",
+    suffix_groupmean = "_bp"
+  )
+
+data |> 
+  select(id, day_cen, wellbeing, wellbeing_bp, wellbeing_wp) |> 
+  filter(id %in% c(102, 103)) |> 
+  display()
+```
+
+## Explorar correlaciones totales
+
+Este bloque revisa asociaciones generales entre variables sin separar niveles.
+
+```{r}
+data |> 
+  dplyr::select(wellbeing, decentering, negative_affect) |> 
+  psych::pairs.panels(main = "Correlaciones totales muestra general")
+```
+
+## Explorar correlaciones entre e intra personas
+
+Este bloque compara las correlaciones entre-personas con las correlaciones intra-persona.
+
+```{r}
+#| fig-align: center
+data |> 
+  dplyr::select(wellbeing_bp, decentering_bp, negative_affect_bp) |> 
+  psych::pairs.panels(main = "Correlaciones ENTRE personas")
+
+data |>
+  dplyr::select(wellbeing_wp, decentering_wp, negative_affect_wp) |> 
+  psych::pairs.panels(main = "Correlaciones INTRA personas")
+```
+
+## Modelo nulo: just-intercept
+
+Este bloque estima un modelo con intercepto aleatorio para comprobar la dependencia de las observaciones.
+
+```{r}
+#| output-location: slide
+
+m0 <- glmmTMB::glmmTMB(
+  wellbeing ~ (1 | id),
+  data = data, 
+  REML = FALSE
+)
+
+summary(m0)
+```
+
+## Correlación intraclase
+
+Este bloque calcula la proporción de varianza del bienestar que se encuentra entre personas.
+
+```{r}
+performance::icc(m0)
+```
+
+## Estimar modelos con diferentes efectos
+
+Este bloque compara modelos con predictores sin centrar, efectos separados y pendientes aleatorias.
+
+```{r}
+# variables sin centrar
+m1a <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering + (1 | id),
+  data = data, 
+  REML = FALSE
+)
+
+m1b <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering + decentering_bp + (1 | id),
+  data = data, 
+  REML = FALSE
+)
+
+# variables centradas por el grupo
+m1c <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + decentering_bp + (1 | id),
+  data = data, 
+  REML = FALSE
+)
+
+# intercepto y pendiente aleatoria
+m1d <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + decentering_bp +
+    (1 + decentering_wp | id),
+  data = data, 
+  REML = FALSE
+)
+
+# intercepto y pendiente aleatoria sin correlación
+m1e <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + decentering_bp +
+    (1 + decentering_wp || id),
+  data = data, 
+  REML = FALSE
+)
+```
+
+## Examinar los modelos
+
+Este bloque organiza los modelos en una tabla para comparar sus parámetros y ajuste.
+
+```{r}
+#| output-location: slide
+
+sjPlot::tab_model(
+  m0, m1a, m1b, m1c, m1d, m1e,
+  show.ci = FALSE, 
+  show.dev = TRUE, 
+  dv.labels = c(
+    "Wellbeing (Just-intercept)",
+    "Wellbeing (efectos combinados)",
+    "Wellbeing (efecto contextual)",
+    "Wellbeing (efectos separados)",
+    "Wellbeing (random slope)",
+    "Wellbeing (random slope sin correlación)"
+  )
+)
+```
+
+## Modelo con predictores intra- y entre-personas
+
+Este bloque estima un modelo con descentramiento y disforia separados en componentes intra- y entre-personas.
+
+```{r}
+m2 <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + dysphoria_wp +
+    decentering_bp + dysphoria_bp +
+    (1 | id),
+  data = data, 
+  REML = FALSE
+)
+```
+
+## Modelo con pendiente aleatoria
+
+Este bloque añade variabilidad entre personas en el efecto intra-persona del descentramiento.
+
+```{r}
+m3 <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + dysphoria_wp +
+    decentering_bp + dysphoria_bp +
+    (1 + decentering_wp | id),
+  data = data, 
+  REML = FALSE
+)
+```
+
+## Comparar modelos
+
+Este bloque compara el modelo de intercepto aleatorio con el modelo de pendiente aleatoria.
+
+```{r}
+sjPlot::tab_model(
+  m2, m3,
+  show.ci = FALSE, 
+  show.dev = TRUE
+)
+```
+
+## Evaluar el ajuste de los modelos
+
+Este bloque compara indicadores de ajuste y desempeño de los modelos.
+
+```{r}
+performance::compare_performance(m2, m3) |> 
+  display()
+```
+
+## Comparar modelos con likelihood ratio test
+
+Este bloque contrasta si el modelo más complejo mejora el ajuste frente al modelo más simple.
+
+```{r}
+anova(m2, m3)
+```
+
+## Cambio en varianza explicada
+
+Este bloque inspecciona los componentes de varianza para evaluar cambios entre modelos.
+
+```{r}
+glmmTMB::VarCorr(m0)
+glmmTMB::VarCorr(m2)
+```
+
+## Calcular cambio en varianza
+
+Este bloque muestra cómo calcular el cambio proporcional de varianza entre modelos.
+
+```{r}
+# Cambio en R2 entre-personas
+(0.81653 - 0.65473) / 0.81653
+
+# Cambio en R2 intra-persona
+(0.46008 - 0.40978) / 0.46008
+```
+
+## Modelo de crecimiento
+
+Este bloque añade el tiempo como predictor para evaluar cambio en bienestar a lo largo de los días.
+
+```{r}
+m4 <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + dysphoria_wp +
+    decentering_bp + dysphoria_bp + day_cen +
+    (1 + day_cen | id),
+  data = data, 
+  REML = FALSE
+)
+
+sjPlot::tab_model(
+  m2, m4,
+  show.ci = FALSE, 
+  show.dev = TRUE
+)
+```
+
+## Interacción con el tiempo
+
+Este bloque evalúa si el efecto intra-persona de la disforia cambia a lo largo de los días.
+
+```{r}
+#| output-location: slide
+m5 <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp + dysphoria_wp * day_cen +
+    decentering_bp + dysphoria_bp + day_cen +
+    (1 + day_cen | id),
+  data = data, 
+  REML = FALSE
+)
+
+summary(m5)
+```
+
+## Pendientes simples para la interacción con el tiempo
+
+Este bloque estima el efecto de la disforia intra-persona en cada día del estudio.
+
+```{r}
+modelbased::estimate_slopes(
+  model = m5,
+  trend = "dysphoria_wp",
+  by = "day_cen=[0,1,2,3,4,5,6]"
+)
+```
+
+## Visualizar pendientes simples
+
+Este bloque grafica las pendientes simples de la interacción con el tiempo.
+
+```{r}
+#| fig-align: center
+modelbased::estimate_slopes(
+  model = m5,
+  trend = "dysphoria_wp",
+  by = "day_cen=[0,1,2,3,4,5,6]"
+) |> 
+  plot()
+```
+
+## Visualizar medias estimadas
+
+Este bloque representa medias estimadas para interpretar la interacción con el tiempo.
+
+```{r}
+#| fig-align: center
+modelbased::estimate_means(
+  model = m5,
+  by = c("dysphoria_wp", "day_cen=[0,6]")
+) |> 
+  plot()
+```
+
+## Interacción entre niveles
+
+Este bloque evalúa si el efecto intra-persona del descentramiento depende de la disforia promedio de la persona.
+
+```{r}
+#| output-location: slide
+m6 <- glmmTMB::glmmTMB(
+  wellbeing ~ decentering_wp * dysphoria_bp +
+    dysphoria_wp +
+    decentering_bp + dysphoria_bp + day_cen +
+    (1 + day_cen | id),
+  data = data, 
+  REML = FALSE
+)
+
+summary(m6)
+```
+
+## Pendientes simples para la interacción entre niveles
+
+Este bloque estima el efecto intra-persona del descentramiento en niveles bajos, medios y altos de disforia entre-personas.
+
+```{r}
+modelbased::estimate_slopes(
+  model = m6,
+  trend = "decentering_wp",
+  by = "dysphoria_bp=[sd]"
+)
+```
+
+## Visualizar la interacción entre niveles
+
+Este bloque grafica medias estimadas para interpretar la interacción entre niveles.
+
+```{r}
+#| fig-align: center
+modelbased::estimate_means(
+  model = m6,
+  by = c("decentering_wp", "dysphoria_bp=[sd]")
+) |> 
+  plot()
+```
+
+# Ejercicio
+
+## Ejercicio: modelo multinivel paso a paso
+
+En este ejercicio vamos a estimar un modelo multinivel para explicar la **disforia momentánea**.
+
+- Variable dependiente: **dysphoria**
+- Variable intra-persona: **decentering_wp**
+- Variable entre-personas: **decentering_bp**
+- Tiempo: **day_cen**
+- Variable de personalidad: **BFI_N_bp**
+- Interacción: **decentering_wp * BFI_N_bp**
+
+### Tareas
+
+1. Estimar un modelo nulo o *just-intercept model*.
+2. Determinar la correlación intraclase (ICC).
+3. Añadir predictores intra- y entre-personas: **decentering_wp**, **decentering_bp** y **day_cen**.
+4. Añadir la variable entre-personas **BFI_N_bp**.
+5. Incluir la interacción entre **decentering_wp** y **BFI_N_bp**.
+6. Examinar las pendientes simples de **decentering_wp** según **BFI_N_bp**.
+7. Escribir una interpretación breve.
+
+## Respuesta 1. Modelo nulo
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 2. Correlación intraclase
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 3. Predictores intra-, entre- y crecimiento
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 4. Variable entre-personas
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 5. Interacción entre niveles
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 6. Pendientes simples
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
+
+## Respuesta 7. Interpretación
+
+Este espacio queda disponible para resolver el punto del ejercicio.
+
+```{r}
+# escribe tu respuesta aquí
+```
